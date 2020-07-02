@@ -34,13 +34,13 @@ def du_crra(c, sigma):
 def w_t(b_2_t, b_3_t, alpha, A, n):
     """ Equilibrium wage rate as a function of the distribution of capital,
         capital income share, productivity, and total labor.
-    
+
     Args:
         b_2_t: Savings at age 2 as of time t.
         b_3_t: Savings at age 3 as of time t.
         alpha: Capital income share.
         A: Productivity.
-        n: Total labor. 
+        n: Total labor.
 
     Returns:
         Equilibrium wage rate as of time t.
@@ -59,7 +59,7 @@ def get_wpath(Kpath, alpha, A, L, m):
 def r_t(b_2_t, b_3_t, alpha, A, L, delta):
     """ Equilibrium interest rate as a function of the distribution of capital,
         capital income share, productivity, total labor, and depreciation rate.
-    
+
     Args:
         b_2_t: Savings at age 2 as of time t.
         b_3_t: Savings at age 3 as of time t.
@@ -83,7 +83,7 @@ def get_rpath(Kpath, alpha, A, L, delta, m):
 
 
 def c(b_2, b_3, w, r, nvec):
-    """ Consumption 
+    """ Consumption
     """
     c_1 = nvec[0] * w - b_2
     c_2 = nvec[1] * w + (1 + r) * b_2 - b_3
@@ -98,7 +98,7 @@ def feasible(f_params, bvec_guess):
     Args:
         f_params: Tuple (nvec, A, alpha, delta).
         bvec_guess: np.array([scalar, scalar]).
-    
+
     Returns:
         Tuple of Boolean vectors:
         - b_cnstr (length 2, denotes which element of bvec_guess is likely
@@ -180,7 +180,7 @@ def get_SS(params, bvec_guess, SS_graphs=False):
         SS_graphs: Boolean that generates a figure of the steady-state
             distribution of consumption and savings if set to True.
             Defaults to False.
-    
+
     Returns:
         Dictionary with the steady-state solution values for the
         following endogenous objects:
@@ -252,7 +252,7 @@ def b_3_2_opt_fun(b_3_2, b0, wpath, rpath, beta, sigma, nvec):
         Euler error.
     """
     lhs = du_crra(nvec[1] * wpath[0] + (1 + rpath[0]) * b0[0] - b_3_2, sigma)
-    rhs = (beta * (1 + rpath[1]) * 
+    rhs = (beta * (1 + rpath[1]) *
         du_crra((1 + rpath[1] * b_3_2 + nvec[2] * wpath[1]), sigma))
     return lhs - rhs
 
@@ -271,6 +271,12 @@ def l2_norm(v1, v2):
     return np.power(v1 / v2 - 1, 2).sum()
 
 
+def get_c_full_lifetime(bvec, wpath, rpath, nvec):
+    bvec_full = np.hstack((0.0, bvec, 0.0))
+    cvec = (1 + rpath) * bvec_full[:-1] + wpath * nvec - bvec_full[1:]
+    cvec_cstr = cvec <= 0
+    return cvec, cvec_cstr
+
 def tpi_pair_opt_fun(bvec, wpath, rpath, beta, sigma, nvec, t):
     """
     Args:
@@ -282,17 +288,17 @@ def tpi_pair_opt_fun(bvec, wpath, rpath, beta, sigma, nvec, t):
         nvec:
         t: Time period to solve for, i.e. b_{2,t} an b_{3,t+1}.
     """
+    cvec, cve_cstr = get_c_full_lifetime(bvec, wpath, rpath, nvec)
+    # Make each negative consumption artifically positive
+    cvec[c_cnstr] = 9999.
+
     n_1, n_2, n_3 = nvec
     # Equation 2.32.
-    lhs_2_32 = du_crra(n_1 * wpath[t-2] - bvec[0], sigma)
-    rhs_2_32 = (beta * (1 + rpath[t-1]) * 
-                du_crra(n_2 * wpath[t-1] + (1 + rpath[t-1]) * bvec[0] - bvec[1],
-                        sigma))
+    lhs_2_32 = du_crra(cvec[0], sigma)
+    rhs_2_32 = (beta * (1 + rpath[t-1]) * du_crra(cvec[1], sigma))
     # Equation 2.33.
-    lhs_2_33 = du_crra(n_2 * wpath[t-1] + (1 + rpath[t-1]) * bvec[0] - bvec[1],
-                       sigma)
-    rhs_2_33 = (beta * (1 + rpath[t]) *
-                du_crra((1 + rpath[t]) * bvec[1] + n_3 * wpath[t], sigma))
+    lhs_2_33 = du_crra(cvec[1], sigma)
+    rhs_2_33 = (beta * (1 + rpath[t]) * du_crra(cvec[2], sigma))
     return [rhs_2_32 - lhs_2_32, rhs_2_33 - lhs_2_33]
 
 
@@ -359,7 +365,7 @@ def tpi(b0_ratios, bvec_guess, beta, sigma, nvec, L, A, alpha, delta, T, m, xi,
         A:
         alpha:
         delta:
-        T: 
+        T:
         m: Number of additioanl periods to solve for beyond T.
         xi: Kpath blending parameter.
         tol: Tolerance for calculating the steady state, b_{3,2},
